@@ -48,7 +48,7 @@ class Analizator:
                 all_mortality = pd.merge(current_mortality, previous_mortality, on='State', suffixes=suffixes)
                 all_mortality['K_Mortality'] = all_mortality.Deaths_current_year / all_mortality.Deaths_previous_year
                 all_mortality = all_mortality.drop(['Deaths_current_year', 'Deaths_previous_year'], axis=1)
-                all_mortality = all_mortality[all_mortality.K_Mortality>0]
+                all_mortality = all_mortality[all_mortality.K_Mortality>0.3]
                 
                 data = pd.merge(month_vaccination, all_mortality, on='State')
                 
