@@ -15,6 +15,7 @@ warnings.simplefilter(action='ignore')
 FOLDER = '/home/denis/Documents/Covid/Russia/'
 PERIOD_DISEASE = 10
 DELAY_VACCINATION_DATA = 5
+BUILD_HALF_REIONS = True
 
 
 class VaccinationData:
@@ -262,7 +263,8 @@ class Analyzator:
             for indicator in ('Vaccinated', 'FullyVaccinated'):
                 month_vaccination = self._get_vaccination_for_month(month, indicator)
                 all_data = self._merge_all_dataframes(mortality, month_vaccination,  indicator)
-            
+                # all_data = all_data[all_data.PartUnvaccined<0.75]
+                
                 x = all_data.PartUnvaccined
                 y = all_data.K_mortality
                 fig.add_scatter(x, y, indicator)
@@ -287,7 +289,22 @@ class Analyzator:
         
     def _get_population(self):
         file_name = FOLDER + 'Popul2021_Site-1.csv'
-        return pd.read_csv(file_name, sep=';', header=0, names=['Region', 'Population'], usecols=(0,1))
+        data = pd.read_csv(file_name, sep=';', header=0, names=['Region', 'Population'], usecols=(0,1))
+        
+        #delete aggregated regions
+        removed_rows = []
+        for index in data.index:
+            if data.loc[index].Region.find(' округ') >= 0:
+                removed_rows.append(index)
+        data = data.drop(removed_rows, axis=0)
+            
+        if BUILD_HALF_REIONS:
+            data = data.sort_values(by='Population', ascending=False)
+            data = data.reset_index(drop=True)
+            middle = len(data) * 0.5
+            data = data[data.index<middle]
+            
+        return data
       
     def _get_vaccination_for_month(self, month, column):
         def get_date(date_int):

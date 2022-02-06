@@ -14,6 +14,7 @@ FOLDER = '/home/denis/Documents/Covid/USA/'
 PERIOD_DISEASE = 10
 DELAY_VACCINATION_DATA = 5
 USE_PREDICTED_MORTALITY = True
+BUILD_HALF_REIONS = True
 
 
 class AgeGroups(Enum):
@@ -36,6 +37,12 @@ class Analizator:
             days = PERIOD_DISEASE-DELAY_VACCINATION_DATA
             border_date = month - np.timedelta64(days, 'D')
             month_vaccination = vaccination[vaccination.Date==border_date]
+            
+            if BUILD_HALF_REIONS:
+                half = len(month_vaccination) * 0.5
+                month_vaccination = month_vaccination.sort_values(by='Population', ascending=False)
+                month_vaccination = month_vaccination.reset_index(drop=True)
+                month_vaccination = month_vaccination[month_vaccination.index<half]
             
             figure = VaccinationFigure(month)
             for age_group in AgeGroups:
@@ -74,12 +81,20 @@ class Analizator:
         names = ['Date', 'State', 'First', 'FirstPct', 'First65Plus', 'First65PlusPct', 'Second', 'SecondPct', 'Second65Plus', 'Second65PlusPct']
         usecols = (0, 2, 25, 26, 31, 32, 33, 34, 39, 40)
         data = pd.read_csv(file_name, header=0, names=names, usecols=usecols, parse_dates=[0])
+        data = data[data.State!='US']
         return data.astype({'Date': 'datetime64[D]'})
     
     def _count_unvaccination(self, vaccination):
+        mask = (vaccination.FirstPct>0) & (vaccination.First65PlusPct>0)
+        vaccination = vaccination[mask]
+        
         vaccination['Population']        = vaccination.First * 100 / vaccination.FirstPct
         vaccination['Population65Plus']  = vaccination.First65Plus * 100 / vaccination.First65PlusPct
         vaccination['Population65Minus'] = vaccination.Population - vaccination.Population65Plus
+        
+        mask = (vaccination.Population.notnull()) & (vaccination.Population65Plus.notnull()) & \
+                (vaccination.Population65Minus.notnull() & (vaccination.Population65Minus>0))
+        vaccination = vaccination[mask]
         
         vaccination['First65Minus']     = vaccination.First - vaccination.First65Plus
         vaccination['First65MinusPart'] = 1 - vaccination.First65Minus /  vaccination.Population65Minus
@@ -91,8 +106,8 @@ class Analizator:
         vaccination['SecondPart']        = 1 - vaccination.SecondPct / 100
         vaccination['Second65PlusPart']  = 1 - vaccination.Second65PlusPct / 100
         
-        removed_columns = ['First', 'FirstPct', 'First65Plus', 'First65PlusPct', 'Second', 'SecondPct', 'Second65Plus', 'Second65PlusPct', \
-                           'Population', 'Population65Plus', 'Population65Minus', 'First65Minus', 'Second65Minus']
+        removed_columns = ['First', 'FirstPct', 'First65Plus', 'First65PlusPct', 'Second', 'SecondPct', 'Second65Plus',
+                           'Second65PlusPct', 'Population65Plus', 'Population65Minus', 'First65Minus', 'Second65Minus']
         return vaccination.drop(removed_columns, axis=1)
         
     def _read_mortality(self):
